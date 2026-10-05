@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,sans-serif;background:#f2f2f7;color:#1c1c1e;height:100vh;padding-bottom:70px;position:relative;overflow:hidden}
+.hd{padding:16px 20px 8px}
+.hd h1{font-size:34px;font-weight:800;letter-spacing:-1px}
+.hd p{color:#8e8e93;font-size:13px;margin-top:2px}
+.sec{font-size:13px;font-weight:600;color:#8e8e93;text-transform:uppercase;padding:14px 20px 8px}
+.list{background:#fff;margin:0 16px;border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #f0f0f2}
+.row:last-child{border-bottom:0}
+.emoji{width:44px;height:44px;border-radius:11px;background:#f2f2f7;display:grid;place-items:center;font-size:22px}
+.row .t{font-weight:600;font-size:16px}
+.row .s{font-size:13px;color:#8e8e93;margin-top:1px}
+.chev{margin-left:auto;color:#c7c7cc;font-size:18px}
+.fab{position:fixed;right:20px;bottom:88px;width:54px;height:54px;border-radius:50%;background:#ff6b35;
+  color:#fff;font-size:30px;display:grid;place-items:center;box-shadow:0 8px 20px rgba(255,107,53,.4)}
+.tabbar{position:fixed;bottom:0;left:0;right:0;height:70px;background:rgba(249,249,249,.94);
+  backdrop-filter:blur(20px);border-top:1px solid #e5e5ea;display:flex;align-items:center;padding-bottom:8px}
+.tab{flex:1;text-align:center;font-size:10px;color:#8e8e93;font-weight:600}
+.tab .i{font-size:20px;display:block;margin-bottom:2px}
+.tab.on{color:#ff6b35}
+</style></head>
+<body>
+  <div class="hd"><h1>Cookbook</h1><p>12 recipes · 3 folders</p></div>
+  <div class="sec">Quick access</div>
+  <div class="list">
+    <div class="row"><div class="emoji">🍝</div><div><div class="t">Spaghetti Bolognese</div><div class="s">Dinner · 8 ingredients</div></div><div class="chev">›</div></div>
+    <div class="row"><div class="emoji">🥗</div><div><div class="t">Caesar Salad</div><div class="s">Lunch · 6 ingredients</div></div><div class="chev">›</div></div>
+    <div class="row"><div class="emoji">🍰</div><div><div class="t">Chocolate Cake</div><div class="s">Dessert · 9 ingredients</div></div><div class="chev">›</div></div>
+  </div>
+  <div class="sec">All recipes</div>
+  <div class="list">
+    <div class="row"><div class="emoji">🍜</div><div><div class="t">Ramen</div><div class="s">Japanese · 11 ingredients</div></div><div class="chev">›</div></div>
+    <div class="row"><div class="emoji">🌮</div><div><div class="t">Tacos</div><div class="s">Mexican · 7 ingredients</div></div><div class="chev">›</div></div>
+  </div>
+  <div class="fab">+</div>
+  <div class="tabbar">
+    <div class="tab on"><span class="i">📖</span>Cookbook</div>
+    <div class="tab"><span class="i">🏠</span>Home</div>
+    <div class="tab"><span class="i">🌍</span>Discover</div>
+    <div class="tab"><span class="i">⚙️</span>Settings</div>
+  </div>
+</body></html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,sans-serif;background:#fff4ec;color:#2a1a10;height:100vh;overflow:hidden;padding-bottom:70px}
+.hero{background:linear-gradient(135deg,#ff6b35,#ff2d78);padding:26px 22px 30px;border-radius:0 0 30px 30px;color:#fff;position:relative}
+.hero h1{font-size:30px;font-weight:900;letter-spacing:-1px}
+.hero p{opacity:.9;font-size:14px;margin-top:4px}
+.chips{display:flex;gap:8px;margin-top:16px;overflow-x:auto}
+.chip{background:rgba(255,255,255,.25);padding:8px 15px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.chip.on{background:#fff;color:#ff2d78}
+.sec{padding:22px 22px 10px;font-weight:800;font-size:19px;letter-spacing:-.4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 18px}
+.card{background:#fff;border-radius:20px;padding:14px;box-shadow:0 6px 18px rgba(255,90,50,.12)}
+.thumb{height:78px;border-radius:14px;display:grid;place-items:center;font-size:38px;margin-bottom:10px}
+.t1{background:linear-gradient(135deg,#ffe0a3,#ffb35c)}
+.t2{background:linear-gradient(135deg,#c8f7d4,#7ee0a0)}
+.t3{background:linear-gradient(135deg,#ffd0e0,#ff9ec4)}
+.t4{background:linear-gradient(135deg,#d3e4ff,#9ec2ff)}
+.card h3{font-size:15px;font-weight:800;letter-spacing:-.2px}
+.card .m{font-size:12px;color:#a08b7c;margin-top:4px;font-weight:500}
+.fab{position:fixed;right:20px;bottom:88px;width:56px;height:56px;border-radius:18px;
+  background:linear-gradient(135deg,#ff6b35,#ff2d78);color:#fff;font-size:30px;display:grid;place-items:center;
+  box-shadow:0 10px 24px rgba(255,45,120,.45)}
+.tabbar{position:fixed;bottom:0;left:0;right:0;height:70px;background:#fff;display:flex;align-items:center;
+  padding-bottom:8px;box-shadow:0 -4px 20px rgba(255,90,50,.1)}
+.tab{flex:1;text-align:center;font-size:10px;color:#b9a598;font-weight:700}
+.tab .i{font-size:20px;display:block;margin-bottom:2px}
+.tab.on{color:#ff2d78}
+</style></head>
+<body>
+  <div class="hero">
+    <h1>Hey Chef 👋</h1>
+    <p>What are we cooking today?</p>
+    <div class="chips">
+      <div class="chip on">All</div><div class="chip">Dinner</div><div class="chip">Dessert</div><div class="chip">Quick</div>
+    </div>
+  </div>
+  <div class="sec">Popular 🔥</div>
+  <div class="grid">
+    <div class="card"><div class="thumb t1">🍝</div><h3>Spaghetti</h3><div class="m">8 ingredients</div></div>
+    <div class="card"><div class="thumb t2">🥗</div><h3>Caesar Salad</h3><div class="m">6 ingredients</div></div>
+    <div class="card"><div class="thumb t3">🍰</div><h3>Choc Cake</h3><div class="m">9 ingredients</div></div>
+    <div class="card"><div class="thumb t4">🍜</div><h3>Ramen</h3><div class="m">11 ingredients</div></div>
+  </div>
+  <div class="fab">+</div>
+  <div class="tabbar">
+    <div class="tab on"><span class="i">📖</span>Cookbook</div>
+    <div class="tab"><span class="i">🏠</span>Home</div>
+    <div class="tab"><span class="i">🌍</span>Discover</div>
+    <div class="tab"><span class="i">⚙️</span>Settings</div>
+  </div>
+</body></html>

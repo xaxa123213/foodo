@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,sans-serif;background:#0e0e12;color:#f2f2f5;height:100vh;overflow:hidden;padding-bottom:70px}
+.hd{padding:20px 20px 6px;display:flex;justify-content:space-between;align-items:center}
+.hd h1{font-size:28px;font-weight:800;letter-spacing:-.8px}
+.av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#ff8a5b,#ff2d78)}
+.search{margin:14px 16px;background:#1a1a22;border-radius:14px;padding:13px 16px;color:#6b6b7a;font-size:14px;border:1px solid #23232e}
+.sec{padding:16px 20px 10px;font-size:15px;font-weight:700;letter-spacing:-.2px}
+.list{padding:0 16px}
+.card{display:flex;gap:14px;align-items:center;background:#15151c;border:1px solid #22222d;border-radius:18px;padding:14px;margin-bottom:10px}
+.ic{width:50px;height:50px;border-radius:14px;background:linear-gradient(135deg,#2a2a38,#1c1c26);display:grid;place-items:center;font-size:24px}
+.card .t{font-weight:700;font-size:15px}
+.card .s{font-size:12.5px;color:#7a7a8c;margin-top:2px}
+.badge{margin-left:auto;font-size:11px;font-weight:700;color:#ff8a5b;background:rgba(255,138,91,.12);padding:5px 10px;border-radius:8px}
+.fab{position:fixed;right:20px;bottom:90px;width:56px;height:56px;border-radius:50%;
+  background:linear-gradient(135deg,#ff8a5b,#ff2d78);color:#fff;font-size:30px;display:grid;place-items:center;
+  box-shadow:0 0 30px rgba(255,90,120,.5)}
+.tabbar{position:fixed;bottom:0;left:0;right:0;height:70px;background:#141419;border-top:1px solid #22222d;
+  display:flex;align-items:center;padding-bottom:8px}
+.tab{flex:1;text-align:center;font-size:10px;color:#5d5d6e;font-weight:600}
+.tab .i{font-size:20px;display:block;margin-bottom:2px}
+.tab.on{color:#ff8a5b}
+</style></head>
+<body>
+  <div class="hd"><h1>Cookbook</h1><div class="av"></div></div>
+  <div class="search">🔍  Search recipes…</div>
+  <div class="sec">Saved</div>
+  <div class="list">
+    <div class="card"><div class="ic">🍝</div><div><div class="t">Spaghetti Bolognese</div><div class="s">Dinner · 8 ingredients</div></div><div class="badge">8</div></div>
+    <div class="card"><div class="ic">🥗</div><div><div class="t">Caesar Salad</div><div class="s">Lunch · 6 ingredients</div></div><div class="badge">6</div></div>
+    <div class="card"><div class="ic">🍰</div><div><div class="t">Chocolate Cake</div><div class="s">Dessert · 9 ingredients</div></div><div class="badge">9</div></div>
+    <div class="card"><div class="ic">🍜</div><div><div class="t">Ramen</div><div class="s">Japanese · 11 ingredients</div></div><div class="badge">11</div></div>
+  </div>
+  <div class="fab">+</div>
+  <div class="tabbar">
+    <div class="tab on"><span class="i">📖</span>Cookbook</div>
+    <div class="tab"><span class="i">🏠</span>Home</div>
+    <div class="tab"><span class="i">🌍</span>Discover</div>
+    <div class="tab"><span class="i">⚙️</span>Settings</div>
+  </div>
+</body></html>
