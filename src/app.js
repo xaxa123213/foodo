@@ -332,8 +332,13 @@ async function exportBackup() {
     }
     return;
   }
+  const file = new File([json], name, { type: "application/json" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: "Foodo backup" }); return; }
+    catch (err) { if (err && err.name === "AbortError") return; }
+  }
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+  a.href = URL.createObjectURL(file);
   a.download = name;
   a.click();
 }
@@ -617,6 +622,8 @@ render();
 if (!NATIVE && "serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js");
 }
+// Ask the browser not to evict saved recipes under storage pressure.
+if (!NATIVE && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
 // Android hardware/gesture back: close the sheet, then step back through screens, then exit.
 if (NATIVE && Capacitor.Plugins.App) {
