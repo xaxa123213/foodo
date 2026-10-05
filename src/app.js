@@ -19,6 +19,8 @@ function load() {
 function save() { localStorage.setItem(STORE, JSON.stringify(recipes)); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
+const NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+
 const $ = (id) => document.getElementById(id);
 const lines = (s) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 const folders = () => [...new Set(recipes.map((r) => r.folder).filter(Boolean))].sort();
@@ -296,13 +298,7 @@ function renderSettings() {
 
   renderThemeControls();
 
-  $("set-export").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(recipes, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "foodo-recipes.json";
-    a.click();
-  });
+  $("set-export").addEventListener("click", exportBackup);
   $("set-import").addEventListener("click", () => $("set-file").click());
   $("set-file").addEventListener("change", (e) => {
     const f = e.target.files[0];
@@ -320,6 +316,26 @@ function renderSettings() {
     };
     reader.readAsText(f);
   });
+}
+
+async function exportBackup() {
+  const json = JSON.stringify(recipes, null, 2);
+  const name = "foodo-recipes.json";
+  if (NATIVE) {
+    // Android WebView can't download blobs, so hand the file to the system share sheet.
+    try {
+      const { Filesystem, Share } = Capacitor.Plugins;
+      const { uri } = await Filesystem.writeFile({ path: name, data: json, directory: "CACHE", encoding: "utf8" });
+      await Share.share({ title: "Foodo backup", files: [uri], dialogTitle: "Save your Foodo backup" });
+    } catch (err) {
+      if (!/cancel/i.test(String(err && err.message))) alert("Couldn't export: " + (err && err.message || err));
+    }
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+  a.download = name;
+  a.click();
 }
 
 const TAB_NAMES = { recipes: "Cookbook", home: "Home", discover: "Discover", settings: "Settings", shop: "Shopping" };
@@ -539,6 +555,10 @@ function applyTheme() {
   }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = theme.bg;
+  if (NATIVE && Capacitor.Plugins.SystemBars) {
+    const lightIcons = theme.dark || theme.style === "bold";
+    Capacitor.Plugins.SystemBars.setStyle({ style: lightIcons ? "DARK" : "LIGHT" }).catch(() => {});
+  }
   localStorage.setItem(THEME_KEY, JSON.stringify(theme));
 }
 
@@ -593,6 +613,18 @@ syncTabs();
 render();
 
 // Service workers need https; skipping on http keeps local dev free of stale caches.
-if ("serviceWorker" in navigator && location.protocol === "https:") {
+// The native app already ships its files, so a cache there would only serve stale versions after updates.
+if (!NATIVE && "serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js");
+}
+
+// Android hardware/gesture back: close the sheet, then step back through screens, then exit.
+if (NATIVE && Capacitor.Plugins.App) {
+  Capacitor.Plugins.App.addListener("backButton", () => {
+    const back = $("d-back") || $("s-back");
+    if (!$("sheet").classList.contains("hidden")) closeEditor();
+    else if (back) back.click();
+    else if (currentTab !== "recipes") { currentTab = "recipes"; syncTabs(); render(); animateView(); }
+    else Capacitor.Plugins.App.exitApp();
+  });
 }

@@ -1,3 +1,7 @@
 node_modules/
+android/
+ios/
+*.jks
+*.keystore
 .DS_Store
 Thumbs.db

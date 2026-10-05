@@ -1,11 +1,11 @@
 // Offline support: serve from cache instantly, refresh the cache in the background.
 // Bump CACHE whenever the app shell file list changes.
-const CACHE = "foodo-v4";
+const CACHE = "foodo-v5";
 const SHELL = [
   "./",
   "index.html",
-  "styles.css?v=4",
-  "app.js?v=4",
+  "styles.css?v=5",
+  "app.js?v=5",
   "manifest.json",
   "icon-192.png",
   "icon-512.png",
