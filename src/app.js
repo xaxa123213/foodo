@@ -61,6 +61,7 @@ const ICON = {
   camera: svg('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/>'),
   keyboard: svg('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 13h6"/>', 2),
   sparkle: svg('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
+  heart: svg('<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>'),
   fridge: svg('<rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M5 10h14M9 5.5v2M9 13v3"/>'),
 };
 
@@ -162,29 +163,190 @@ function renderHome() {
       </div>
     </section>
     <div class="quick">
-      <button class="quick-btn" id="h-add">
-        <span class="quick-ico">${ICON.plus}</span>
-        <span><b>New recipe</b><small>Save a favourite</small></span>
+      <button class="quick-btn" id="h-post">
+        <span class="quick-ico">${ICON.camera}</span>
+        <span><b>Share a meal</b><small>Post what you ate</small></span>
       </button>
       <button class="quick-btn" id="h-shop">
         <span class="quick-ico">${ICON.cart}</span>
         <span><b>Shopping list</b><small>Plan your shop</small></span>
       </button>
     </div>
+    ${recent.length ? `
+      <div class="section-head">
+        <h2>Recently added</h2>
+        <button class="link" id="h-all">See all</button>
+      </div>
+      <div class="rail">${recent.map(recipeTile).join("")}</div>` : ""}
     <div class="section-head">
-      <h2>Recently added</h2>
-      ${recipes.length ? `<button class="link" id="h-all">See all</button>` : ""}
+      <h2>Food feed</h2>
+      <div class="seg" role="tablist">
+        <button role="tab" data-feed="all" class="${feedFilter === "all" ? "on" : ""}">Everyone</button>
+        <button role="tab" data-feed="mine" class="${feedFilter === "mine" ? "on" : ""}">Mine</button>
+      </div>
     </div>
-    ${recent.length
-      ? `<div class="rail">${recent.map(recipeTile).join("")}</div>`
-      : emptyState(ICON.book, "No recipes yet", "Your latest recipes will show up here.")}
+    <div id="feed"></div>
   `;
-  $("h-add").addEventListener("click", () => openEditor(null));
+  $("h-post").addEventListener("click", openComposer);
   $("h-shop").addEventListener("click", goShopping);
   const all = $("h-all");
   if (all) all.addEventListener("click", () => { currentTab = "recipes"; syncTabs(); render(); animateView(); });
+  v.querySelectorAll("[data-feed]").forEach((b) => b.addEventListener("click", () => {
+    feedFilter = b.dataset.feed;
+    v.querySelectorAll("[data-feed]").forEach((x) => x.classList.toggle("on", x === b));
+    renderFeed();
+  }));
   bindOpen(v);
+  renderFeed();
 }
+
+// ---- Food feed ----
+let posts = [];
+let feedFilter = "all";
+let draftPhoto = null;
+
+const postsDb = (() => {
+  let conn = null;
+  const open = () => conn || (conn = new Promise((res, rej) => {
+    const req = indexedDB.open("foodo", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("posts", { keyPath: "id" });
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  }));
+  const run = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction("posts", mode);
+      const req = fn(tx.objectStore("posts"));
+      tx.oncomplete = () => res(req.result);
+      tx.onerror = tx.onabort = () => rej(tx.error);
+    });
+  };
+  return {
+    all: () => run("readonly", (s) => s.getAll()),
+    put: (p) => run("readwrite", (s) => s.put(p)),
+    del: (id) => run("readwrite", (s) => s.delete(id)),
+  };
+})();
+
+function timeAgo(t) {
+  const s = Math.floor((Date.now() - t) / 1000);
+  if (s < 60) return "Just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 172800) return "Yesterday";
+  return new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+function postCard(p) {
+  const r = p.recipeId && recipes.find((x) => x.id === p.recipeId);
+  return `
+    <article class="post">
+      <header class="post-head">
+        <span class="avatar">Y</span>
+        <span class="post-who"><b>You</b><span>${timeAgo(p.created)}</span></span>
+        <button class="icon-btn" data-del="${p.id}" aria-label="Delete post">${ICON.trash}</button>
+      </header>
+      <img class="post-photo" src="${p.photo}" alt="${esc(p.caption || "Meal photo")}" loading="lazy" />
+      <div class="post-actions">
+        <button class="like ${p.liked ? "on" : ""}" data-like="${p.id}" aria-label="Like">${ICON.heart}</button>
+      </div>
+      ${p.caption ? `<p class="post-caption"><b>You</b> ${esc(p.caption)}</p>` : ""}
+      ${r ? `<button class="post-recipe" data-id="${r.id}"><span class="art thumb xs" style="${coverStyle(r.name)}">${initial(r.name)}</span><span>${esc(r.name)}</span>${ICON.chevron}</button>` : ""}
+    </article>`;
+}
+
+function renderFeed() {
+  const el = $("feed");
+  if (!el) return;
+  const list = [...posts].sort((a, b) => b.created - a.created);
+  const community = feedFilter === "all"
+    ? `<div class="community-card"><span class="notice-ico">${ICON.compass}</span><p><b>Posts from other cooks are coming.</b> Once the community launches you'll see what everyone's eating here.</p></div>`
+    : "";
+  el.innerHTML = list.length
+    ? `<div class="feed">${list.map(postCard).join("")}</div>${community}`
+    : emptyState(ICON.camera, "Share your first meal", "Snap what you're eating and it'll show up in your feed.",
+        `<button class="btn primary" id="f-post">${ICON.camera}Share a meal</button>`) + community;
+
+  const fp = $("f-post");
+  if (fp) fp.addEventListener("click", openComposer);
+  bindOpen(el);
+  el.querySelectorAll("[data-like]").forEach((b) => b.addEventListener("click", () => {
+    const p = posts.find((x) => x.id === b.dataset.like);
+    if (!p) return;
+    p.liked = !p.liked;
+    b.classList.toggle("on", p.liked);
+    postsDb.put(p).catch(() => {});
+  }));
+  el.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
+    if (!confirm("Delete this post?")) return;
+    const id = b.dataset.del;
+    postsDb.del(id).then(() => { posts = posts.filter((x) => x.id !== id); renderFeed(); })
+      .catch(() => alert("Couldn't delete the post."));
+  }));
+}
+
+function openComposer() {
+  draftPhoto = null;
+  $("post-body").innerHTML = `
+    <button class="photo-pick" id="post-photo-btn">
+      <span class="photo-empty">${ICON.camera}<b>Add a photo</b><small>Take one or choose from your library</small></span>
+    </button>
+    <input type="file" id="post-file" accept="image/*" class="hidden" />
+    <div class="field">
+      <label class="field-label" for="post-caption">Caption</label>
+      <textarea id="post-caption" class="input" rows="3" placeholder="What did you eat? How was it?"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="post-recipe">Recipe <span class="hint">Optional</span></label>
+      <div class="select-wrap">
+        <select id="post-recipe" class="input">
+          <option value="">No recipe</option>
+          ${recipes.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("")}
+        </select>
+        ${svg('<path d="m6 9 6 6 6-6"/>', 2)}
+      </div>
+    </div>`;
+  const pick = $("post-photo-btn");
+  pick.addEventListener("click", () => $("post-file").click());
+  $("post-file").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      draftPhoto = frameToDataUrl(img, img.naturalWidth, img.naturalHeight, 1080);
+      URL.revokeObjectURL(img.src);
+      pick.classList.add("has-photo");
+      pick.innerHTML = `<img src="${draftPhoto}" alt="Your meal" /><span class="photo-change">Change photo</span>`;
+    };
+    img.src = URL.createObjectURL(f);
+  });
+  $("post-save").disabled = false;
+  $("post-sheet").classList.remove("hidden");
+}
+
+function closeComposer() { $("post-sheet").classList.add("hidden"); draftPhoto = null; }
+
+async function savePost() {
+  if (!draftPhoto) { alert("Add a photo of your meal first."); return; }
+  const p = {
+    id: uid(),
+    created: Date.now(),
+    photo: draftPhoto,
+    caption: $("post-caption").value.trim(),
+    recipeId: $("post-recipe").value || null,
+    liked: false,
+  };
+  const btn = $("post-save");
+  btn.disabled = true;
+  try { await postsDb.put(p); }
+  catch { btn.disabled = false; alert("Couldn't save the post — your phone may be low on storage."); return; }
+  posts.unshift(p);
+  closeComposer();
+  currentTab = "home"; syncTabs(); render(); animateView();
+}
+
+postsDb.all().then((p) => { posts = p || []; if (currentTab === "home") renderFeed(); }).catch(() => {});
 
 function renderRecipes() {
   const v = $("view");
@@ -514,8 +676,8 @@ function stopCamera() {
   if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
 }
 
-function frameToDataUrl(src, w, h) {
-  const s = Math.min(1, 1024 / Math.max(w, h));
+function frameToDataUrl(src, w, h, max = 1024) {
+  const s = Math.min(1, max / Math.max(w, h));
   const c = document.createElement("canvas");
   c.width = Math.round(w * s); c.height = Math.round(h * s);
   c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
@@ -850,6 +1012,9 @@ $("add-btn").addEventListener("click", () => openEditor(null));
 $("cancel-btn").addEventListener("click", closeEditor);
 $("save-btn").addEventListener("click", saveEditor);
 $("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") closeEditor(); });
+$("post-cancel").addEventListener("click", closeComposer);
+$("post-save").addEventListener("click", savePost);
+$("post-sheet").addEventListener("click", (e) => { if (e.target.id === "post-sheet") closeComposer(); });
 
 const header = $("app-header");
 window.addEventListener("scroll", () => header.classList.toggle("scrolled", window.scrollY > 4), { passive: true });
@@ -870,7 +1035,8 @@ if (!NATIVE && navigator.storage && navigator.storage.persist) navigator.storage
 if (NATIVE && Capacitor.Plugins.App) {
   Capacitor.Plugins.App.addListener("backButton", () => {
     const back = $("d-back") || $("s-back") || $("sc-back");
-    if (!$("sheet").classList.contains("hidden")) closeEditor();
+    if (!$("post-sheet").classList.contains("hidden")) closeComposer();
+    else if (!$("sheet").classList.contains("hidden")) closeEditor();
     else if (back) back.click();
     else if (currentTab !== "recipes") { currentTab = "recipes"; syncTabs(); render(); animateView(); }
     else Capacitor.Plugins.App.exitApp();
