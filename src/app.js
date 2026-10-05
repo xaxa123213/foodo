@@ -11,12 +11,15 @@ let currentTab = "recipes";
 let returnTab = "home";
 let activeFolder = "__all__";
 let query = "";
-const gotItems = new Set(); // ticked-off shopping items, session only
+const GOT_KEY = "foodo.got.v1";
+const gotItems = loadGot(); // ticked-off shopping items
 
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; }
 }
 function save() { localStorage.setItem(STORE, JSON.stringify(recipes)); }
+function loadGot() { try { return new Set(JSON.parse(localStorage.getItem(GOT_KEY)) || []); } catch { return new Set(); } }
+function saveGot() { localStorage.setItem(GOT_KEY, JSON.stringify([...gotItems])); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 const NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
@@ -489,11 +492,12 @@ function renderShopping() {
       b.addEventListener("click", () => {
         const key = b.dataset.item;
         gotItems.has(key) ? gotItems.delete(key) : gotItems.add(key);
+        saveGot();
         b.classList.toggle("done");
       }));
     const clear = $("s-clear");
     if (clear) clear.addEventListener("click", () => {
-      shoppingSet.clear(); gotItems.clear(); saveShop(); renderShopping();
+      shoppingSet.clear(); gotItems.clear(); saveShop(); saveGot(); renderShopping();
     });
   }
   $("s-back").addEventListener("click", () => { currentTab = returnTab; syncTabs(); render(); animateView(); });
