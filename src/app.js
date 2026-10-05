@@ -57,6 +57,11 @@ const ICON = {
   palette: svg('<path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1.5 3.3A1.6 1.6 0 0 1 12 22z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15.5" cy="7.5" r="1"/>', 2),
   image: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m3 16 5-5 5 5"/><path d="m13 14 2-2 6 6"/>', 2),
   moon: svg('<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>', 2),
+  x: svg('<path d="M18 6 6 18M6 6l12 12"/>', 2.4),
+  camera: svg('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/>'),
+  keyboard: svg('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 13h6"/>', 2),
+  sparkle: svg('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
+  fridge: svg('<rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M5 10h14M9 5.5v2M9 13v3"/>'),
 };
 
 // ---- Recipe artwork ----
@@ -128,7 +133,9 @@ function goShopping() {
 
 // ---- Views ----
 function render() {
+  stopCamera();
   if (currentTab === "recipes") renderRecipes();
+  else if (currentTab === "scan") renderScan();
   else if (currentTab === "home") renderHome();
   else if (currentTab === "shop") renderShopping();
   else if (currentTab === "discover") renderDiscover();
@@ -346,11 +353,12 @@ async function exportBackup() {
   a.click();
 }
 
-const TAB_NAMES = { recipes: "Cookbook", home: "Home", discover: "Discover", settings: "Settings", shop: "Shopping" };
+const TAB_NAMES = { recipes: "Cookbook", home: "Home", scan: "Scan", discover: "Discover", settings: "Settings", shop: "Shopping" };
 
 function openDetail(id) {
   const r = recipes.find((x) => x.id === id);
   if (!r) return;
+  stopCamera();
   const onList = shoppingSet.has(r.id);
   const v = $("view");
   v.innerHTML = `
@@ -443,6 +451,232 @@ function saveEditor() {
   save(); closeEditor();
   if (editingId) openDetail(data.id); else render();
 }
+
+// ---- Scan: fridge → ingredients → recipe matches ----
+const FRIDGE_KEY = "foodo.fridge.v1";
+let fridge = loadFridge();
+let scanStep = "camera"; // camera | items | results
+let scanPhoto = null;
+let camStream = null;
+
+function loadFridge() { try { return JSON.parse(localStorage.getItem(FRIDGE_KEY)) || []; } catch { return []; } }
+function saveFridge() { localStorage.setItem(FRIDGE_KEY, JSON.stringify(fridge)); }
+
+const FILLER = new Set(("g kg mg ml l cl dl oz lb lbs tbsp tbs tsp cup cups clove cloves pinch handful bunch " +
+  "can cans tin tins pack packet slice slices piece pieces x of a an the and or to for large small medium big " +
+  "ripe fresh frozen chopped sliced diced grated finely roughly optional some few").split(" "));
+const STAPLES = new Set(["salt", "pepper", "water", "oil", "olive", "black", "ice"]);
+
+const coreWords = (s) => String(s).toLowerCase()
+  .replace(/\(.*?\)/g, " ")
+  .replace(/[^a-z\u00c0-\u024f\s]/g, " ")
+  .split(/\s+/)
+  .filter((w) => w.length > 1 && !FILLER.has(w));
+const stem = (w) =>
+  w.endsWith("oes") ? w.slice(0, -2) :
+  w.endsWith("ies") ? w.slice(0, -3) + "y" :
+  w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w;
+const stems = (s) => coreWords(s).map(stem);
+const isStaple = (st) => st.every((w) => STAPLES.has(w));
+const covers = (item, line) => item.length > 0 && item.every((w) => line.includes(w));
+
+function matchRecipes() {
+  const have = fridge.map(stems).filter((a) => a.length);
+  return recipes.map((r) => {
+    const needed = r.ingredients
+      .map((text) => ({ text, st: stems(text) }))
+      .filter((l) => l.st.length && !isStaple(l.st));
+    const missing = needed.filter((l) => !have.some((h) => covers(h, l.st))).map((l) => l.text);
+    return { r, missing, total: needed.length };
+  }).filter((m) => m.total > 0);
+}
+
+function fridgeSuggestions() {
+  const have = fridge.map(stems).filter((a) => a.length);
+  const counts = new Map();
+  for (const r of recipes) for (const ing of r.ingredients) {
+    const words = coreWords(ing);
+    const st = words.map(stem);
+    if (!words.length || isStaple(st) || have.some((h) => covers(h, st))) continue;
+    const name = words.join(" ");
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([n]) => n);
+}
+
+function addFridgeItem(name) {
+  const v = name.trim();
+  if (!v || fridge.some((f) => f.toLowerCase() === v.toLowerCase())) return;
+  fridge.push(v); saveFridge();
+}
+
+function stopCamera() {
+  if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
+}
+
+function frameToDataUrl(src, w, h) {
+  const s = Math.min(1, 1024 / Math.max(w, h));
+  const c = document.createElement("canvas");
+  c.width = Math.round(w * s); c.height = Math.round(h * s);
+  c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.8);
+}
+
+function goScanStep(step) { scanStep = step; stopCamera(); renderScan(); animateView(); }
+
+function renderScan() {
+  if (scanStep === "items") return renderScanItems();
+  if (scanStep === "results") return renderScanResults();
+  renderScanCamera();
+}
+
+function renderScanCamera() {
+  const v = $("view");
+  v.innerHTML = `
+    ${pageHead("Scan your fridge", "Snap a photo, then confirm what's inside.")}
+    <div class="viewfinder" id="vf">
+      <video id="sc-video" autoplay playsinline muted></video>
+      <div class="vf-frame"></div>
+      <div class="vf-msg" id="vf-msg">${ICON.camera}<span>Starting camera…</span></div>
+      <div class="vf-hint">Fit the shelves in the frame</div>
+    </div>
+    <div class="scan-controls">
+      <button class="side-btn" id="sc-upload"><span class="side-ico">${ICON.image}</span>Photo</button>
+      <button class="shutter" id="sc-shoot" aria-label="Take photo"></button>
+      <button class="side-btn" id="sc-skip"><span class="side-ico">${ICON.keyboard}</span>Type it</button>
+    </div>
+    <input type="file" id="sc-file" accept="image/*" class="hidden" />`;
+
+  const video = $("sc-video");
+  const showMsg = (text) => {
+    $("vf").classList.remove("live");
+    $("vf-msg").innerHTML = `${ICON.camera}<span>${text}</span>`;
+  };
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showMsg("Camera isn't available here. Upload a photo or type your ingredients.");
+  } else {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false })
+      .then((stream) => {
+        if (!video.isConnected) { stream.getTracks().forEach((t) => t.stop()); return; }
+        stopCamera();
+        camStream = stream;
+        video.srcObject = stream;
+        $("vf").classList.add("live");
+      })
+      .catch(() => showMsg("No camera access. Allow the camera in your settings, or upload a photo instead."));
+  }
+
+  $("sc-shoot").addEventListener("click", () => {
+    if (!camStream || !video.videoWidth) { $("sc-file").click(); return; }
+    scanPhoto = frameToDataUrl(video, video.videoWidth, video.videoHeight);
+    goScanStep("items");
+  });
+  $("sc-upload").addEventListener("click", () => $("sc-file").click());
+  $("sc-skip").addEventListener("click", () => { scanPhoto = null; goScanStep("items"); });
+  $("sc-file").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => { scanPhoto = frameToDataUrl(img, img.naturalWidth, img.naturalHeight); URL.revokeObjectURL(img.src); goScanStep("items"); };
+    img.src = URL.createObjectURL(f);
+  });
+}
+
+function renderScanItems() {
+  const v = $("view");
+  const sugg = fridgeSuggestions();
+  v.innerHTML = `
+    <button class="back" id="sc-back">${ICON.back}<span>Retake</span></button>
+    ${pageHead("What's in your fridge?", fridge.length ? plural(fridge.length, "ingredient") : "Add what you can see.")}
+    <div class="notice">
+      ${scanPhoto ? `<img class="notice-photo" src="${scanPhoto}" alt="Your fridge photo" />` : `<span class="notice-ico">${ICON.sparkle}</span>`}
+      <p><b>Automatic detection is coming soon.</b> For now, add what you see${scanPhoto ? " in your photo" : ""}. Your list is saved for next time.</p>
+    </div>
+    <form class="add-row" id="fr-form">
+      <input class="input" id="fr-input" type="text" placeholder="Add an ingredient…" autocomplete="off" enterkeyhint="done" />
+      <button class="btn primary icon" type="submit" aria-label="Add">${ICON.plus}</button>
+    </form>
+    ${fridge.length
+      ? `<div class="chips">${fridge.map((f, i) => `<span class="ing-chip">${esc(f)}<button class="chip-x" data-rm="${i}" aria-label="Remove ${esc(f)}">${ICON.x}</button></span>`).join("")}</div>
+         <button class="link small-link" id="fr-clear">Clear fridge</button>`
+      : `<div class="group"><p class="muted-row">Nothing added yet.</p></div>`}
+    ${sugg.length ? `
+      <h2 class="section-label">From your recipes</h2>
+      <div class="chips">${sugg.map((s) => `<button class="sugg-chip" data-add="${esc(s)}">${ICON.plus}${esc(s)}</button>`).join("")}</div>` : ""}
+    <div class="sticky-cta">
+      <button class="btn primary block" id="fr-done" ${fridge.length ? "" : "disabled"}>${ICON.sparkle}Done — find recipes</button>
+    </div>`;
+
+  $("sc-back").addEventListener("click", () => goScanStep("camera"));
+  $("fr-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = $("fr-input");
+    input.value.split(",").forEach(addFridgeItem);
+    renderScanItems();
+    $("fr-input").focus();
+  });
+  v.querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => {
+    fridge.splice(Number(b.dataset.rm), 1); saveFridge(); renderScanItems();
+  }));
+  v.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => {
+    addFridgeItem(b.dataset.add); renderScanItems();
+  }));
+  const clear = $("fr-clear");
+  if (clear) clear.addEventListener("click", () => {
+    if (confirm("Remove everything from your fridge list?")) { fridge = []; saveFridge(); renderScanItems(); }
+  });
+  $("fr-done").addEventListener("click", () => goScanStep("results"));
+}
+
+function matchRow({ r, missing }) {
+  const status = missing.length
+    ? `<span class="missing">Missing: ${missing.map(esc).join(", ")}</span>`
+    : `<span class="tag ok">${ICON.check}You have everything</span>`;
+  return `
+    <button class="recipe" data-id="${r.id}">
+      <span class="art thumb" style="${coverStyle(r.name)}">${initial(r.name)}</span>
+      <span class="recipe-body">
+        <span class="recipe-name">${esc(r.name)}</span>
+        <span class="recipe-meta">${status}</span>
+      </span>
+      <span class="chev">${ICON.chevron}</span>
+    </button>`;
+}
+
+function renderScanResults() {
+  const v = $("view");
+  const matches = matchRecipes();
+  const ready = matches.filter((m) => !m.missing.length);
+  const close = matches.filter((m) => m.missing.length > 0 && m.missing.length <= 2)
+    .sort((a, b) => a.missing.length - b.missing.length);
+
+  let body;
+  if (!recipes.length) {
+    body = emptyState(ICON.book, "No recipes yet", "Add some recipes to your cookbook and Foodo will match them to your fridge.");
+  } else if (!ready.length && !close.length) {
+    body = emptyState(ICON.fridge, "Nothing quite fits yet",
+      "None of your recipes are within two ingredients. Try adding more of what's in your fridge.");
+  } else {
+    body = `
+      ${ready.length ? `<h2 class="section-label">Ready to cook · ${ready.length}</h2><div class="list">${ready.map(matchRow).join("")}</div>` : ""}
+      ${close.length ? `<h2 class="section-label">Almost there · ${close.length}</h2><div class="list">${close.map(matchRow).join("")}</div>` : ""}`;
+  }
+
+  v.innerHTML = `
+    <button class="back" id="sc-back">${ICON.back}<span>Edit ingredients</span></button>
+    ${pageHead("You could cook", `Based on ${plural(fridge.length, "ingredient")} in your fridge`)}
+    ${body}
+    <p class="footnote">Salt, pepper, oil and water are assumed. Community recipes will appear here once Discover launches.</p>`;
+
+  $("sc-back").addEventListener("click", () => goScanStep("items"));
+  bindOpen(v);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && camStream) stopCamera();
+  else if (!document.hidden && currentTab === "scan" && scanStep === "camera" && $("sc-video")) renderScanCamera();
+});
 
 // ---- Shopping list ----
 function loadShop() { try { return new Set(JSON.parse(localStorage.getItem(SHOP_KEY)) || []); } catch { return new Set(); } }
@@ -607,7 +841,10 @@ function syncTabs() {
     t.classList.toggle("active", t.dataset.tab === currentTab));
 }
 document.querySelectorAll(".tab").forEach((t) =>
-  t.addEventListener("click", () => { currentTab = t.dataset.tab; syncTabs(); render(); animateView(); }));
+  t.addEventListener("click", () => {
+    if (t.dataset.tab === "scan" && currentTab !== "scan") scanStep = "camera";
+    currentTab = t.dataset.tab; syncTabs(); render(); animateView();
+  }));
 
 $("add-btn").addEventListener("click", () => openEditor(null));
 $("cancel-btn").addEventListener("click", closeEditor);
@@ -632,7 +869,7 @@ if (!NATIVE && navigator.storage && navigator.storage.persist) navigator.storage
 // Android hardware/gesture back: close the sheet, then step back through screens, then exit.
 if (NATIVE && Capacitor.Plugins.App) {
   Capacitor.Plugins.App.addListener("backButton", () => {
-    const back = $("d-back") || $("s-back");
+    const back = $("d-back") || $("s-back") || $("sc-back");
     if (!$("sheet").classList.contains("hidden")) closeEditor();
     else if (back) back.click();
     else if (currentTab !== "recipes") { currentTab = "recipes"; syncTabs(); render(); animateView(); }

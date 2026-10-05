@@ -35,6 +35,8 @@ jobs:
       - name: Generate Android project
         run: |
           npx cap add android
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.CAMERA" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          grep -n "permission" android/app/src/main/AndroidManifest.xml
           npx capacitor-assets generate --android \
             --iconBackgroundColor '#ff6b35' \
             --splashBackgroundColor '#f6f4f1' \
